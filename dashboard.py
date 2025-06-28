@@ -114,9 +114,11 @@ if not filtered_df.empty:
                         for i in range(st.session_state.current_move_index):
                             try:
                                 st.session_state.board.push_san(st.session_state.current_opening_moves[i])
-                            except Exception as e: # Catch broad errors during replay
-                                st.error(f"Error replaying move '{st.session_state.current_opening_moves[i]}': {e}")
-                                # Potentially stop replay or handle error state
+                            except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
+                                st.error(f"Error replaying move '{st.session_state.current_opening_moves[i]}' (specific chess error): {e}")
+                                break
+                            except Exception as e: # Fallback for other unexpected errors
+                                st.error(f"An unexpected error occurred while replaying move '{st.session_state.current_opening_moves[i]}': {e}")
                                 break
 
                 with col2:
@@ -156,9 +158,11 @@ def replay_interactive_board_to_index(move_idx):
             if i < len(st.session_state.interactive_moves_history):
                 try:
                     board.push_san(st.session_state.interactive_moves_history[i])
-                except Exception as e:
-                    st.error(f"Error replaying move '{st.session_state.interactive_moves_history[i]}' at index {i}: {e}")
-                    # If a move in history is bad, stop replay for this board instance
+                except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
+                    st.error(f"Error replaying move '{st.session_state.interactive_moves_history[i]}' at index {i} (specific chess error): {e}")
+                    break
+                except Exception as e: # Fallback for other unexpected errors
+                    st.error(f"An unexpected error occurred while replaying move '{st.session_state.interactive_moves_history[i]}' at index {i}: {e}")
                     break
             else: # Should not happen if move_idx is managed correctly
                 st.warning(f"Attempted to replay move at index {i} beyond history length.")
