@@ -23,6 +23,14 @@ if 'current_move_index' not in st.session_state:
 if 'board' not in st.session_state:
     st.session_state.board = chess.Board()
 
+# For the interactive chessboard
+if 'interactive_board' not in st.session_state:
+    st.session_state.interactive_board = chess.Board()
+if 'interactive_moves_history' not in st.session_state:
+    st.session_state.interactive_moves_history = []
+if 'interactive_current_move_index' not in st.session_state:
+    st.session_state.interactive_current_move_index = 0
+
 # Load the chess openings data
 @st.cache_data
 def load_data():
@@ -130,6 +138,93 @@ if not filtered_df.empty:
             elif moves_str and not filtered_df.empty : # Handles openings that might have moves but they are invalid from the start
                 st.warning("This opening has moves listed, but they could not be processed to display a board.")
             # If filtered_df is empty, this whole detail section is skipped by selected_opening_name != "---" and not filtered_df.empty
+
+st.divider()
+st.header("Interactive Chessboard")
+
+# Helper function to replay interactive board to a specific move index
+def replay_interactive_board_to_index(move_idx):
+    """
+    Replays moves from st.session_state.interactive_moves_history up to move_idx
+    and updates st.session_state.interactive_board.
+    """
+    board = chess.Board()
+    # Only try to replay moves if there's history and index is valid
+    if st.session_state.interactive_moves_history and move_idx > 0 :
+        for i in range(move_idx):
+            # Check if the move index is within the bounds of the history list
+            if i < len(st.session_state.interactive_moves_history):
+                try:
+                    board.push_san(st.session_state.interactive_moves_history[i])
+                except Exception as e:
+                    st.error(f"Error replaying move '{st.session_state.interactive_moves_history[i]}' at index {i}: {e}")
+                    # If a move in history is bad, stop replay for this board instance
+                    break
+            else: # Should not happen if move_idx is managed correctly
+                st.warning(f"Attempted to replay move at index {i} beyond history length.")
+                break
+    st.session_state.interactive_board = board
+
+
+# UI for move input
+move_input = st.text_input("Enter your move (e.g., e4, Nf3):", key="interactive_move_input_key")
+make_move_button = st.button("Make Move", key="interactive_make_move_button_key")
+
+if make_move_button and move_input:
+    try:
+        # When a new move is made, it's on the current state of st.session_state.interactive_board
+        # If interactive_current_move_index is not at the end of history (e.g., user went back, then made a new move),
+        # this new move should effectively create a new branch of history.
+        # For simplicity, let's assume new moves always append to the current board state,
+        # and if the user was in the past, this new move truncates any "future" moves from old history.
+        if st.session_state.interactive_current_move_index < len(st.session_state.interactive_moves_history):
+            # User had navigated back, now making a new move. Truncate old future.
+            st.session_state.interactive_moves_history = st.session_state.interactive_moves_history[:st.session_state.interactive_current_move_index]
+            # The board should already be at interactive_current_move_index due to navigation.
+
+        # board_to_update is st.session_state.interactive_board, which is either fresh or replayed to current_move_index
+        st.session_state.interactive_board.push_san(move_input) # Apply new move
+
+        st.session_state.interactive_moves_history.append(move_input)
+        st.session_state.interactive_current_move_index = len(st.session_state.interactive_moves_history)
+
+        st.session_state.interactive_move_input_key = ""
+        st.success(f"Move '{move_input}' made successfully.")
+        # The board is already up-to-date. No replay needed here.
+
+    except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
+        st.error(f"Invalid move '{move_input}': {e}")
+    except Exception as e:
+        st.error(f"An unexpected error occurred while making move '{move_input}': {e}")
+
+# Navigation buttons for the interactive board
+col_prev, col_next = st.columns(2)
+
+with col_prev:
+    if st.button("Previous Interactive Move", key="interactive_prev_move",
+                 disabled=st.session_state.interactive_current_move_index == 0):
+        st.session_state.interactive_current_move_index -= 1
+        replay_interactive_board_to_index(st.session_state.interactive_current_move_index)
+
+with col_next:
+    if st.button("Next Interactive Move", key="interactive_next_move",
+                 disabled=st.session_state.interactive_current_move_index >= len(st.session_state.interactive_moves_history)):
+        st.session_state.interactive_current_move_index += 1
+        replay_interactive_board_to_index(st.session_state.interactive_current_move_index)
+
+# Display the interactive chessboard and move count
+st.subheader("Current Interactive Board")
+# Ensure st.session_state.interactive_board is always up-to-date based on user actions
+if 'interactive_board' in st.session_state:
+    st.image(chess.svg.board(board=st.session_state.interactive_board), caption="Interactive Board")
+else: # Should ideally not happen if initialized correctly
+    st.warning("Interactive board is not available in session state.")
+
+if 'interactive_current_move_index' in st.session_state and 'interactive_moves_history' in st.session_state:
+    st.write(f"Move: {st.session_state.interactive_current_move_index} / {len(st.session_state.interactive_moves_history)}")
+else: # Should ideally not happen
+    st.warning("Interactive move history/index is not available in session state.")
+
 
 st.sidebar.title("Summary Statistics") # Changed from st.sidebar.header
 st.sidebar.metric("Total Openings Displayed", len(filtered_df)) # This will be 0 if data loading failed
