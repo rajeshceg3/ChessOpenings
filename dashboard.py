@@ -126,12 +126,50 @@ st.markdown(custom_css, unsafe_allow_html=True)
 
 st.title("Chess Openings Dashboard")
 
-with st.expander("ℹ️ Welcome and Instructions", expanded=False):
+with st.expander("ℹ️ How to Use This Dashboard (Beginner's Guide)", expanded=False):
     st.markdown("""
-    Welcome to the Chess Openings Dashboard!
-    - Use the filters below to narrow down the list of openings.
-    - Select an opening from the table or the dropdown further down to see its details and visualize its moves.
-    - Use the 'Previous Move' and 'Next Move' buttons to navigate the opening sequence on the board.
+    Welcome to the Chess Openings Dashboard! This guide will help you get started.
+
+    **1. Exploring Chess Openings:**
+
+    *   **Filtering by ECO Code:**
+        *   The "🏷️ Filter by ECO Code" dropdown on the left allows you to see openings belonging to a specific ECO (Encyclopedia of Chess Openings) code.
+        *   Select an ECO code (e.g., "A00", "B20") to narrow down the list. Select "All" to see all openings.
+    *   **Searching by Name:**
+        *   Use the "🔍 Search by Name" text box on the right to find openings containing specific words (e.g., "King's Gambit", "Sicilian").
+        *   The table will update as you type.
+    *   **Understanding the Openings Table:**
+        *   The main table displays a list of chess openings. Each row shows:
+            *   `ECO`: The ECO code for the opening.
+            *   `Name`: The common name of the opening.
+            *   `Moves`: The sequence of moves in Standard Algebraic Notation (SAN).
+            *   `Description`: A brief description of the opening's strategy or characteristics.
+
+    **2. Viewing Opening Details and Moves:**
+
+    *   **Selecting an Opening:**
+        *   Below the filters, you'll find a dropdown menu labeled "Select Opening to View Details:".
+        *   Choose an opening name from this list.
+        *   Once selected, its detailed information (ECO, Name, Moves, Description) will appear.
+    *   **Visualizing on the Chessboard:**
+        *   After selecting an opening, a chessboard will show its starting position.
+        *   Use the "➡️ Next Move" button to play the next move in the opening sequence on the board.
+        *   Use the "⬅️ Previous Move" button to go back one move.
+        *   The text below the board (e.g., "Move: 1 / 5") tells you which move you are currently viewing out of the total moves in the sequence.
+
+    **3. Trying Your Own Moves (Interactive Chessboard):**
+
+    *   Scroll down to the "Interactive Chessboard" section.
+    *   Here, you can input your own chess moves in the text box (e.g., "e4", "Nf3", "O-O" for castling).
+    *   Click "▶️ Make Move" to see your move on the board.
+    *   You can also navigate through the moves you've made using the "⏪ Previous Interactive Move" and "⏩ Next Interactive Move" buttons in this section.
+
+    **4. Summary Statistics:**
+
+    *   The sidebar on the left (you might need to expand it) shows "📊 Summary Statistics".
+    *   This includes the "Total Openings Displayed" (based on your filters) and a chart of "Openings per ECO Code".
+
+    We hope this helps you explore the fascinating world of chess openings!
     """)
 st.divider()
 
