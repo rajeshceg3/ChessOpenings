@@ -3,14 +3,136 @@ import pandas as pd
 import chess
 import chess.svg
 
+# Set page config (including dark theme if directly supported, or use custom CSS)
+# Streamlit's theming has evolved. Forcing a "dark" theme might be part of the theme object
+# or might require custom CSS. We'll set the page config and then apply custom CSS
+# that ensures a dark background and appropriate text colors if theme="dark" isn't sufficient.
+st.set_page_config(
+    layout="wide",
+    page_title="Chess Openings Dashboard",
+    page_icon=":chess_pawn:",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for modern look and feel
+custom_css = """
+<style>
+    /* Base theme colors - Assuming a dark theme is desired */
+    body {
+        font-family: 'Roboto', 'Open Sans', sans-serif;
+        color: #E0E0E0; /* Light grey text for dark background */
+        background-color: #1E1E1E; /* Dark background */
+    }
+
+    /* Primary color for accents, buttons, etc. */
+    :root {
+        --primary-color: #4A90E2; /* Modern Blue */
+        --primary-color-hover: #357ABD; /* Darker blue for hover */
+        --button-text-color: #FFFFFF;
+        --table-header-bg: #2A2A2A;
+        --table-row-bg: #252525;
+        --table-row-hover-bg: #303030;
+        --table-border-color: #353535;
+    }
+
+    /* General app styling */
+    .stApp {
+        background-color: #1E1E1E; /* Ensure app background is dark */
+    }
+
+    /* Title */
+    h1 {
+        color: var(--primary-color);
+    }
+
+    /* Buttons styling */
+    .stButton>button {
+        background-color: var(--primary-color);
+        color: var(--button-text-color);
+        border: none;
+        border-radius: 8px; /* Rounded corners */
+        padding: 10px 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+        transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .stButton>button:hover {
+        background-color: var(--primary-color-hover);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    .stButton>button:disabled {
+        background-color: #555;
+        color: #AAA;
+        box-shadow: none;
+    }
+
+
+    /* Table styling */
+    .stDataFrame table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+        color: #E0E0E0; /* Light text for table content */
+    }
+    .stDataFrame th {
+        background-color: var(--table-header-bg); /* Darker header for tables */
+        color: #F0F0F0; /* Lighter text for headers */
+        text-align: left;
+        padding: 12px 15px;
+        border-bottom: 2px solid var(--primary-color);
+    }
+    .stDataFrame td {
+        padding: 10px 15px;
+        border-bottom: 1px solid var(--table-border-color); /* Subtle border for rows */
+        background-color: var(--table-row-bg);
+    }
+    .stDataFrame tr:hover td {
+        background-color: var(--table-row-hover-bg); /* Hover effect for rows */
+    }
+    /* Remove Streamlit's default table borders if they conflict */
+    .stDataFrame .dataframe {
+        border: none;
+    }
+
+    /* Selectbox and Text Input styling */
+    .stSelectbox div[data-baseweb="select"] > div,
+    .stTextInput input {
+        border-radius: 5px;
+        border-color: #555; /* Darker border for inputs */
+        background-color: #252525; /* Dark input background */
+        color: #E0E0E0;
+    }
+    .stSelectbox div[data-baseweb="select"] > div:focus,
+    .stTextInput input:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 0.2rem rgba(74, 144, 226, 0.25);
+    }
+
+    /* Markdown links */
+    a {
+        color: var(--primary-color);
+    }
+    a:hover {
+        color: var(--primary-color-hover);
+    }
+
+    /* Sidebar styling */
+    .css-1d391kg { /* Specific class for Streamlit sidebar; may need adjustment if Streamlit updates */
+        background-color: #252525; /* Slightly lighter dark for sidebar */
+    }
+
+</style>
+"""
+st.markdown(custom_css, unsafe_allow_html=True)
+
 st.title("Chess Openings Dashboard")
 
-st.markdown("""
-Welcome to the Chess Openings Dashboard!
-- Use the filters below to narrow down the list of openings.
-- Select an opening from the table or the dropdown further down to see its details and visualize its moves.
-- Use the 'Previous Move' and 'Next Move' buttons to navigate the opening sequence on the board.
-""")
+with st.expander("ℹ️ Welcome and Instructions", expanded=False):
+    st.markdown("""
+    Welcome to the Chess Openings Dashboard!
+    - Use the filters below to narrow down the list of openings.
+    - Select an opening from the table or the dropdown further down to see its details and visualize its moves.
+    - Use the 'Previous Move' and 'Next Move' buttons to navigate the opening sequence on the board.
+    """)
 st.divider()
 
 # Initialize session state variables if they don't exist
@@ -59,19 +181,21 @@ if not chess_df.empty:
 else:
     filtered_df = pd.DataFrame(columns=['ECO', 'Name', 'Moves', 'Description'])
 
-# Filter by ECO code
-eco_codes = ["All"] + sorted(chess_df["ECO"].unique().tolist())
-selected_eco = st.selectbox("Filter by ECO Code:", eco_codes)
+# Filtering options in columns
+filter_col1, filter_col2 = st.columns(2)
 
-if selected_eco != "All":
-    filtered_df = filtered_df[filtered_df["ECO"] == selected_eco]
+with filter_col1:
+    eco_codes = ["All"] + sorted(chess_df["ECO"].unique().tolist())
+    selected_eco = st.selectbox("🏷️ Filter by ECO Code:", eco_codes)
+    if selected_eco != "All": # Apply ECO filter immediately if selected
+        filtered_df = filtered_df[filtered_df["ECO"] == selected_eco]
 
-# Filter by Name
-name_query = st.text_input("Search by Name:", "")
-if name_query:
-    filtered_df = filtered_df[filtered_df["Name"].str.contains(name_query, case=False, na=False)]
+with filter_col2:
+    name_query = st.text_input("🔍 Search by Name:", "")
+    if name_query: # Apply name filter if query exists
+        filtered_df = filtered_df[filtered_df["Name"].str.contains(name_query, case=False, na=False)]
 
-st.dataframe(filtered_df)
+st.dataframe(filtered_df) # Display the possibly filtered dataframe
 
 st.divider()
 
@@ -83,69 +207,72 @@ if not filtered_df.empty:
     if selected_opening_name != "---" and not filtered_df.empty: # Added check for filtered_df
         selected_opening_data = filtered_df[filtered_df["Name"] == selected_opening_name]
         if not selected_opening_data.empty:
-            st.subheader(selected_opening_data['Name'].iloc[0])
-            st.markdown(f"**ECO:** {selected_opening_data['ECO'].iloc[0]}")
-            st.markdown(f"**Moves:** `{selected_opening_data['Moves'].iloc[0]}`")
-            st.markdown(f"**Description:** {selected_opening_data['Description'].iloc[0]}")
+            with st.container(border=True): # Group opening details
+                st.subheader(selected_opening_data['Name'].iloc[0])
+                st.markdown(f"**ECO:** {selected_opening_data['ECO'].iloc[0]}")
+                st.markdown(f"**Moves:** `{selected_opening_data['Moves'].iloc[0]}`")
+                st.markdown(f"**Description:** {selected_opening_data['Description'].iloc[0]}")
 
-            moves_str = selected_opening_data['Moves'].iloc[0]
+                moves_str = selected_opening_data['Moves'].iloc[0]
 
-            # Check if the selected opening has changed
-            if selected_opening_name != st.session_state.selected_opening_name_key:
-                st.session_state.selected_opening_name_key = selected_opening_name
-                st.session_state.current_move_index = 0
-                st.session_state.board = chess.Board()
-                if moves_str:
-                    st.session_state.current_opening_moves = [m for m in moves_str.split(' ') if m] # Filter out empty strings
-                else:
-                    st.session_state.current_opening_moves = []
-                # No moves played yet, board is fresh for the new opening
+                # Check if the selected opening has changed
+                if selected_opening_name != st.session_state.selected_opening_name_key:
+                    st.session_state.selected_opening_name_key = selected_opening_name
+                    st.session_state.current_move_index = 0
+                    st.session_state.board = chess.Board()
+                    if moves_str:
+                        st.session_state.current_opening_moves = [m for m in moves_str.split(' ') if m] # Filter out empty strings
+                    else:
+                        st.session_state.current_opening_moves = []
+                    # No moves played yet, board is fresh for the new opening
 
-            if st.session_state.current_opening_moves:
-                st.subheader("Board Position:")
+                if st.session_state.current_opening_moves:
+                    st.subheader("Board Position:")
 
-                # Navigation buttons
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("Previous Move", disabled=st.session_state.current_move_index == 0):
-                        st.session_state.current_move_index -= 1
-                        # Replay board from scratch
-                        st.session_state.board = chess.Board()
-                        for i in range(st.session_state.current_move_index):
+                    # Navigation buttons
+                    col1_nav, col2_nav = st.columns(2) # Renamed to avoid conflict with filter columns
+                    with col1_nav:
+                        if st.button("⬅️ Previous Move", disabled=st.session_state.current_move_index == 0):
+                            st.session_state.current_move_index -= 1
+                            # Replay board from scratch
+                            st.session_state.board = chess.Board()
+                            for i in range(st.session_state.current_move_index):
+                                try:
+                                    st.session_state.board.push_san(st.session_state.current_opening_moves[i])
+                                except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
+                                    st.error(f"Error replaying move '{st.session_state.current_opening_moves[i]}' (specific chess error): {e}")
+                                    break
+                                except Exception as e: # Fallback for other unexpected errors
+                                    st.error(f"An unexpected error occurred while replaying move '{st.session_state.current_opening_moves[i]}': {e}")
+                                    break
+
+                    with col2_nav:
+                        if st.button("➡️ Next Move", disabled=st.session_state.current_move_index == len(st.session_state.current_opening_moves)):
                             try:
-                                st.session_state.board.push_san(st.session_state.current_opening_moves[i])
+                                move_to_play = st.session_state.current_opening_moves[st.session_state.current_move_index]
+                                st.session_state.board.push_san(move_to_play)
+                                st.session_state.current_move_index += 1
                             except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
-                                st.error(f"Error replaying move '{st.session_state.current_opening_moves[i]}' (specific chess error): {e}")
-                                break
-                            except Exception as e: # Fallback for other unexpected errors
-                                st.error(f"An unexpected error occurred while replaying move '{st.session_state.current_opening_moves[i]}': {e}")
-                                break
-
-                with col2:
-                    if st.button("Next Move", disabled=st.session_state.current_move_index == len(st.session_state.current_opening_moves)):
-                        try:
-                            move_to_play = st.session_state.current_opening_moves[st.session_state.current_move_index]
-                            st.session_state.board.push_san(move_to_play)
-                            st.session_state.current_move_index += 1
-                        except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
-                            st.warning(f"Invalid move '{move_to_play}': {e}")
-                        except IndexError:
-                             st.warning("No more moves to play.")
+                                st.warning(f"Invalid move '{move_to_play}': {e}")
+                            except IndexError:
+                                 st.warning("No more moves to play.")
 
 
-                # Display board and move count
-                st.image(chess.svg.board(board=st.session_state.board))
-                st.write(f"Move: {st.session_state.current_move_index} / {len(st.session_state.current_opening_moves)}")
+                    # Display board and move count
+                    st.image(chess.svg.board(board=st.session_state.board))
+                    st.write(f"Move: {st.session_state.current_move_index} / {len(st.session_state.current_opening_moves)}")
 
-            elif moves_str and not filtered_df.empty : # Handles openings that might have moves but they are invalid from the start
-                st.warning("This opening has moves listed, but they could not be processed to display a board.")
-            # If filtered_df is empty, this whole detail section is skipped by selected_opening_name != "---" and not filtered_df.empty
+                elif moves_str and not filtered_df.empty : # Handles openings that might have moves but they are invalid from the start
+                    st.warning("This opening has moves listed, but they could not be processed to display a board.")
+                # If filtered_df is empty, this whole detail section is skipped by selected_opening_name != "---" and not filtered_df.empty
+            st.markdown("<br>", unsafe_allow_html=True) # Add some space after the container
 
 st.divider()
 st.header("Interactive Chessboard")
 
-# Helper function to replay interactive board to a specific move index
-def replay_interactive_board_to_index(move_idx):
+with st.container(border=True): # Group interactive chessboard section
+    # Helper function to replay interactive board to a specific move index
+    def replay_interactive_board_to_index(move_idx):
     """
     Replays moves from st.session_state.interactive_moves_history up to move_idx
     and updates st.session_state.interactive_board.
@@ -170,11 +297,12 @@ def replay_interactive_board_to_index(move_idx):
     st.session_state.interactive_board = board
 
 
-# UI for move input
-move_input = st.text_input("Enter your move (e.g., e4, Nf3):", key="interactive_move_input_key")
-make_move_button = st.button("Make Move", key="interactive_make_move_button_key")
+    # UI for move input
+    move_input = st.text_input("Enter your move (e.g., e4, Nf3):", key="interactive_move_input_key", help="Use Standard Algebraic Notation (e.g., e4, Nf3, O-O for castling).")
+    # st.caption("Use Standard Algebraic Notation (e.g., e4, Nf3, O-O for castling).") # Alternative way to add help text
+    make_move_button = st.button("▶️ Make Move", key="interactive_make_move_button_key")
 
-if make_move_button and move_input:
+    if make_move_button and move_input:
     try:
         # When a new move is made, it's on the current state of st.session_state.interactive_board
         # If interactive_current_move_index is not at the end of history (e.g., user went back, then made a new move),
@@ -201,41 +329,54 @@ if make_move_button and move_input:
     except Exception as e:
         st.error(f"An unexpected error occurred while making move '{move_input}': {e}")
 
-# Navigation buttons for the interactive board
-col_prev, col_next = st.columns(2)
+    # Navigation buttons for the interactive board
+    col_prev_interactive, col_next_interactive = st.columns(2) # Renamed for clarity
 
-with col_prev:
-    if st.button("Previous Interactive Move", key="interactive_prev_move",
-                 disabled=st.session_state.interactive_current_move_index == 0):
-        st.session_state.interactive_current_move_index -= 1
-        replay_interactive_board_to_index(st.session_state.interactive_current_move_index)
+    with col_prev_interactive:
+        if st.button("⏪ Previous Interactive Move", key="interactive_prev_move",
+                     disabled=st.session_state.interactive_current_move_index == 0):
+            st.session_state.interactive_current_move_index -= 1
+            replay_interactive_board_to_index(st.session_state.interactive_current_move_index)
 
-with col_next:
-    if st.button("Next Interactive Move", key="interactive_next_move",
-                 disabled=st.session_state.interactive_current_move_index >= len(st.session_state.interactive_moves_history)):
-        st.session_state.interactive_current_move_index += 1
-        replay_interactive_board_to_index(st.session_state.interactive_current_move_index)
+    with col_next_interactive:
+        if st.button("⏩ Next Interactive Move", key="interactive_next_move",
+                     disabled=st.session_state.interactive_current_move_index >= len(st.session_state.interactive_moves_history)):
+            st.session_state.interactive_current_move_index += 1
+            replay_interactive_board_to_index(st.session_state.interactive_current_move_index)
 
-# Display the interactive chessboard and move count
-st.subheader("Current Interactive Board")
-# Ensure st.session_state.interactive_board is always up-to-date based on user actions
-if 'interactive_board' in st.session_state:
-    st.image(chess.svg.board(board=st.session_state.interactive_board), caption="Interactive Board")
-else: # Should ideally not happen if initialized correctly
-    st.warning("Interactive board is not available in session state.")
+    # Display the interactive chessboard and move count
+    st.subheader("Current Interactive Board")
+    # Ensure st.session_state.interactive_board is always up-to-date based on user actions
+    if 'interactive_board' in st.session_state:
+        st.image(chess.svg.board(board=st.session_state.interactive_board), caption="Interactive Board")
+    else: # Should ideally not happen if initialized correctly
+        st.warning("Interactive board is not available in session state.")
 
-if 'interactive_current_move_index' in st.session_state and 'interactive_moves_history' in st.session_state:
-    st.write(f"Move: {st.session_state.interactive_current_move_index} / {len(st.session_state.interactive_moves_history)}")
-else: # Should ideally not happen
-    st.warning("Interactive move history/index is not available in session state.")
+    if 'interactive_current_move_index' in st.session_state and 'interactive_moves_history' in st.session_state:
+        st.write(f"Move: {st.session_state.interactive_current_move_index} / {len(st.session_state.interactive_moves_history)}")
+    else: # Should ideally not happen
+        st.warning("Interactive move history/index is not available in session state.")
+    st.markdown("<br>", unsafe_allow_html=True) # Add some space after the container
 
 
-st.sidebar.title("Summary Statistics") # Changed from st.sidebar.header
+st.sidebar.title("📊 Summary Statistics") # Changed from st.sidebar.header
 st.sidebar.metric("Total Openings Displayed", len(filtered_df)) # This will be 0 if data loading failed
 
 if not filtered_df.empty:
     st.sidebar.subheader("Openings per ECO Code")
     eco_counts = filtered_df["ECO"].value_counts()
     st.sidebar.bar_chart(eco_counts)
+
+    st.sidebar.divider() # Add a small divider
+
+    st.sidebar.subheader("Name Insights")
+    # Calculate number of gambit openings based on the filtered DataFrame
+    # Ensure 'Name' column exists and is not empty before attempting string operations
+    if 'Name' in filtered_df.columns and not filtered_df.empty:
+        gambit_count = filtered_df[filtered_df['Name'].str.contains("Gambit", case=False, na=False)].shape[0]
+    else:
+        gambit_count = 0 # Default to 0 if 'Name' column is missing or df is empty
+    st.sidebar.metric(label="Gambit Openings Found", value=gambit_count)
+
 else:
     st.sidebar.info("No data to display statistics for (or data file not found).")
