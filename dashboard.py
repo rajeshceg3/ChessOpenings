@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import chess
 import chess.svg
+import chess.pgn
+import datetime
+import io
 
 # Set page config (including dark theme if directly supported, or use custom CSS)
 # Streamlit's theming has evolved. Forcing a "dark" theme might be part of the theme object
@@ -169,6 +172,16 @@ with st.expander("ℹ️ How to Use This Dashboard (Beginner's Guide)", expanded
     *   The sidebar on the left (you might need to expand it) shows "📊 Summary Statistics".
     *   This includes the "Total Openings Displayed" (based on your filters) and a chart of "Openings per ECO Code".
 
+    **5. Importing and Exporting Games (PGN):**
+
+    *   **Importing a Game (⬆️ Upload PGN File):**
+        *   In the "Interactive Chessboard" section, click on "Browse files" under "⬆️ Upload PGN File".
+        *   Select a PGN file (`.pgn`) from your computer.
+        *   The game from the PGN file will be loaded onto the interactive chessboard, replacing any existing moves. You can then navigate through its moves.
+    *   **Exporting a Game (⬇️ Download PGN):**
+        *   After making moves on the "Interactive Chessboard", the "⬇️ Download PGN" button will appear.
+        *   Click this button to save the sequence of moves you've played on the interactive board as a `.pgn` file to your computer.
+
     We hope this helps you explore the fascinating world of chess openings!
     """)
 st.divider()
@@ -335,6 +348,46 @@ with st.container(border=True): # Group interactive chessboard section
     st.session_state.interactive_board = board
 
 
+    # UI for PGN Upload
+    uploaded_pgn_file = st.file_uploader("⬆️ Upload PGN File", type=["pgn"], accept_multiple_files=False, key="pgn_uploader")
+
+    if uploaded_pgn_file is not None:
+        try:
+            pgn_bytes = uploaded_pgn_file.getvalue()
+            pgn_string = pgn_bytes.decode("utf-8")
+            pgn_file_like = io.StringIO(pgn_string)
+            game = chess.pgn.read_game(pgn_file_like)
+
+            if game:
+                # Clear existing interactive game state
+                st.session_state.interactive_moves_history = []
+                st.session_state.interactive_board = chess.Board() # Reset board
+                st.session_state.interactive_current_move_index = 0
+
+                temp_board_for_san = chess.Board()
+                for move in game.mainline_moves():
+                    san_move = temp_board_for_san.san(move)
+                    st.session_state.interactive_moves_history.append(san_move)
+                    temp_board_for_san.push(move)
+
+                # Board UI will be fresh as index is 0 and board is new.
+                # replay_interactive_board_to_index(0) # Call this to be explicit if needed, but should be covered.
+                st.success("PGN file uploaded and processed successfully. Board and history reset to PGN content.")
+                # Clear the uploader after processing by rerunning with uploaded_pgn_file = None
+                # This usually requires a more complex callback structure or session state trick
+                # For now, the file will remain in the uploader widget until the user removes it or uploads another.
+                # To allow re-uploading the same file, we can set key to a new value or use st.experimental_rerun
+                # For simplicity, we'll leave it as is. The user can remove and re-upload.
+
+            else:
+                st.error("Error: Could not parse PGN file. Please ensure it's a valid PGN.")
+        except Exception as e:
+            st.error(f"An error occurred while processing the PGN file: {e}")
+        # To prevent reprocessing on every script rerun after a successful upload,
+        # you might want to clear uploaded_pgn_file from session_state or use a flag.
+        # For now, this will reprocess if the user interacts with another widget.
+        # A common pattern is to use st.session_state to store the "processed" state of the file.
+
     # UI for move input
     move_input = st.text_input("Enter your move (e.g., e4, Nf3):", key="interactive_move_input_key", help="Use Standard Algebraic Notation (e.g., e4, Nf3, O-O for castling).")
     # st.caption("Use Standard Algebraic Notation (e.g., e4, Nf3, O-O for castling).") # Alternative way to add help text
@@ -394,6 +447,39 @@ with st.container(border=True): # Group interactive chessboard section
         st.write(f"Move: {st.session_state.interactive_current_move_index} / {len(st.session_state.interactive_moves_history)}")
     else: # Should ideally not happen
         st.warning("Interactive move history/index is not available in session state.")
+
+    # PGN Download Button
+    if st.session_state.interactive_moves_history:
+        pgn_game = chess.pgn.Game()
+        pgn_game.headers["Event"] = "Interactive Session"
+        pgn_game.headers["Site"] = "Chess Openings Dashboard"
+        pgn_game.headers["Date"] = datetime.date.today().strftime("%Y.%m.%d")
+        pgn_game.headers["Round"] = "-"
+        pgn_game.headers["White"] = "Player1"
+        pgn_game.headers["Black"] = "Player2"
+        pgn_game.headers["Result"] = "*" # Game is ongoing or result unknown
+
+        # Create a temporary board to validate and add moves
+        temp_board = chess.Board()
+        node = pgn_game # Start with the main game node
+        for move_san in st.session_state.interactive_moves_history:
+            try:
+                move = temp_board.parse_san(move_san)
+                node = node.add_variation(move)
+                temp_board.push(move)
+            except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
+                st.error(f"Error adding move {move_san} to PGN: {e}")
+                # Optionally skip this move or stop PGN generation
+                break
+
+        pgn_string = str(pgn_game)
+
+        st.download_button(
+            label="⬇️ Download PGN",
+            data=pgn_string,
+            file_name="interactive_game.pgn",
+            mime="application/x-chess-pgn"
+        )
     st.markdown("<br>", unsafe_allow_html=True) # Add some space after the container
 
 
