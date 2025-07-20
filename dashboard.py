@@ -394,31 +394,31 @@ with st.container(border=True): # Group interactive chessboard section
     make_move_button = st.button("▶️ Make Move", key="interactive_make_move_button_key")
 
     if make_move_button and move_input:
-    try:
-        # When a new move is made, it's on the current state of st.session_state.interactive_board
-        # If interactive_current_move_index is not at the end of history (e.g., user went back, then made a new move),
-        # this new move should effectively create a new branch of history.
-        # For simplicity, let's assume new moves always append to the current board state,
-        # and if the user was in the past, this new move truncates any "future" moves from old history.
-        if st.session_state.interactive_current_move_index < len(st.session_state.interactive_moves_history):
-            # User had navigated back, now making a new move. Truncate old future.
-            st.session_state.interactive_moves_history = st.session_state.interactive_moves_history[:st.session_state.interactive_current_move_index]
-            # The board should already be at interactive_current_move_index due to navigation.
+        try:
+            # When a new move is made, it's on the current state of st.session_state.interactive_board
+            # If interactive_current_move_index is not at the end of history (e.g., user went back, then made a new move),
+            # this new move should effectively create a new branch of history.
+            # For simplicity, let's assume new moves always append to the current board state,
+            # and if the user was in the past, this new move truncates any "future" moves from old history.
+            if st.session_state.interactive_current_move_index < len(st.session_state.interactive_moves_history):
+                # User had navigated back, now making a new move. Truncate old future.
+                st.session_state.interactive_moves_history = st.session_state.interactive_moves_history[:st.session_state.interactive_current_move_index]
+                # The board should already be at interactive_current_move_index due to navigation.
 
-        # board_to_update is st.session_state.interactive_board, which is either fresh or replayed to current_move_index
-        st.session_state.interactive_board.push_san(move_input) # Apply new move
+            # board_to_update is st.session_state.interactive_board, which is either fresh or replayed to current_move_index
+            st.session_state.interactive_board.push_san(move_input) # Apply new move
 
-        st.session_state.interactive_moves_history.append(move_input)
-        st.session_state.interactive_current_move_index = len(st.session_state.interactive_moves_history)
+            st.session_state.interactive_moves_history.append(move_input)
+            st.session_state.interactive_current_move_index = len(st.session_state.interactive_moves_history)
 
-        st.session_state.interactive_move_input_key = ""
-        st.success(f"Move '{move_input}' made successfully.")
-        # The board is already up-to-date. No replay needed here.
+            st.session_state.interactive_move_input_key = ""
+            st.success(f"Move '{move_input}' made successfully.")
+            # The board is already up-to-date. No replay needed here.
 
-    except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
-        st.error(f"Invalid move '{move_input}': {e}")
-    except Exception as e:
-        st.error(f"An unexpected error occurred while making move '{move_input}': {e}")
+        except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
+            st.error(f"Invalid move '{move_input}': {e}")
+        except Exception as e:
+            st.error(f"An unexpected error occurred while making move '{move_input}': {e}")
 
     # Navigation buttons for the interactive board
     col_prev_interactive, col_next_interactive = st.columns(2) # Renamed for clarity
