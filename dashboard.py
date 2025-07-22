@@ -413,6 +413,7 @@ with st.container(border=True): # Group interactive chessboard section
             st.session_state.interactive_moves_history.append(move_input)
             st.session_state.interactive_current_move_index = len(st.session_state.interactive_moves_history)
 
+            st.session_state.interactive_move_input_key = ""
             st.success(f"Move '{move_input}' made successfully.")
             # The board is already up-to-date. No replay needed here.
 
