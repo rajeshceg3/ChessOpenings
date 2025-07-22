@@ -316,10 +316,10 @@ st.header("Interactive Chessboard")
 with st.container(border=True): # Group interactive chessboard section
     # Helper function to replay interactive board to a specific move index
     def replay_interactive_board_to_index(move_idx):
-    """
-    Replays moves from st.session_state.interactive_moves_history up to move_idx
-    and updates st.session_state.interactive_board.
-    """
+        """
+        Replays moves from st.session_state.interactive_moves_history up to move_idx
+        and updates st.session_state.interactive_board.
+        """
     board = chess.Board()
     # Only try to replay moves if there's history and index is valid
     if st.session_state.interactive_moves_history and move_idx > 0 :
