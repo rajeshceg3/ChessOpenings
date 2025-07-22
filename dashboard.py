@@ -203,6 +203,8 @@ if 'interactive_moves_history' not in st.session_state:
     st.session_state.interactive_moves_history = []
 if 'interactive_current_move_index' not in st.session_state:
     st.session_state.interactive_current_move_index = 0
+if 'pgn_file_id' not in st.session_state:
+    st.session_state.pgn_file_id = None
 
 # Load the chess openings data
 @st.cache_data
@@ -285,17 +287,7 @@ if not filtered_df.empty:
                     with col1_nav:
                         if st.button("⬅️ Previous Move", disabled=st.session_state.current_move_index == 0):
                             st.session_state.current_move_index -= 1
-                            # Replay board from scratch
-                            st.session_state.board = chess.Board()
-                            for i in range(st.session_state.current_move_index):
-                                try:
-                                    st.session_state.board.push_san(st.session_state.current_opening_moves[i])
-                                except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
-                                    st.error(f"Error replaying move '{st.session_state.current_opening_moves[i]}' (specific chess error): {e}")
-                                    break
-                                except Exception as e: # Fallback for other unexpected errors
-                                    st.error(f"An unexpected error occurred while replaying move '{st.session_state.current_opening_moves[i]}': {e}")
-                                    break
+                            st.session_state.board.pop()
 
                     with col2_nav:
                         if st.button("➡️ Next Move", disabled=st.session_state.current_move_index == len(st.session_state.current_opening_moves)):
@@ -352,6 +344,14 @@ with st.container(border=True): # Group interactive chessboard section
     uploaded_pgn_file = st.file_uploader("⬆️ Upload PGN File", type=["pgn"], accept_multiple_files=False, key="pgn_uploader")
 
     if uploaded_pgn_file is not None:
+        # Generate a unique ID for the uploaded file to detect new uploads
+        file_id = f"{uploaded_pgn_file.name}-{uploaded_pgn_file.size}"
+        if st.session_state.pgn_file_id != file_id:
+            st.session_state.pgn_file_id = file_id
+            if 'pgn_processed' in st.session_state:
+                del st.session_state.pgn_processed
+
+    if uploaded_pgn_file is not None and 'pgn_processed' not in st.session_state:
         try:
             pgn_bytes = uploaded_pgn_file.getvalue()
             pgn_string = pgn_bytes.decode("utf-8")
@@ -370,9 +370,11 @@ with st.container(border=True): # Group interactive chessboard section
                     st.session_state.interactive_moves_history.append(san_move)
                     temp_board_for_san.push(move)
 
+                st.session_state.pgn_processed = True
+                replay_interactive_board_to_index(st.session_state.interactive_current_move_index)
+                st.success("PGN file uploaded and processed successfully. Board and history reset to PGN content.")
                 # Board UI will be fresh as index is 0 and board is new.
                 # replay_interactive_board_to_index(0) # Call this to be explicit if needed, but should be covered.
-                st.success("PGN file uploaded and processed successfully. Board and history reset to PGN content.")
                 # Clear the uploader after processing by rerunning with uploaded_pgn_file = None
                 # This usually requires a more complex callback structure or session state trick
                 # For now, the file will remain in the uploader widget until the user removes it or uploads another.
@@ -460,13 +462,11 @@ with st.container(border=True): # Group interactive chessboard section
         pgn_game.headers["Result"] = "*" # Game is ongoing or result unknown
 
         # Create a temporary board to validate and add moves
-        temp_board = chess.Board()
-        node = pgn_game # Start with the main game node
+        node = pgn_game
         for move_san in st.session_state.interactive_moves_history:
             try:
-                move = temp_board.parse_san(move_san)
-                node = node.add_variation(move)
-                temp_board.push(move)
+                move = node.board().parse_san(move_san)
+                node = node.add_main_variation(move)
             except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
                 st.error(f"Error adding move {move_san} to PGN: {e}")
                 # Optionally skip this move or stop PGN generation
@@ -494,10 +494,10 @@ if not filtered_df.empty:
     st.sidebar.divider() # Add a small divider
 
     st.sidebar.subheader("Name Insights")
-    # Calculate number of gambit openings based on the filtered DataFrame
+    # Calculate number of gambit openings based on the original DataFrame
     # Ensure 'Name' column exists and is not empty before attempting string operations
-    if 'Name' in filtered_df.columns and not filtered_df.empty:
-        gambit_count = filtered_df[filtered_df['Name'].str.contains("Gambit", case=False, na=False)].shape[0]
+    if 'Name' in chess_df.columns and not chess_df.empty:
+        gambit_count = chess_df[chess_df['Name'].str.contains("Gambit", case=False, na=False)].shape[0]
     else:
         gambit_count = 0 # Default to 0 if 'Name' column is missing or df is empty
     st.sidebar.metric(label="Gambit Openings Found", value=gambit_count)
