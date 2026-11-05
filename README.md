@@ -38,3 +38,6 @@ This project is a Python Streamlit application designed to display information a
 The chess opening data (`chess_openings.csv`) was curated based on information from various chess resources, including Wikipedia and PGN Mentor.
 The PGN parsing and board logic uses the `python-chess` library.
 The dashboard is built with `streamlit` and uses `pandas` for data manipulation.
+
+## Verification
+See [.cursor/skills/verify-chess-openings/SKILL.md](.cursor/skills/verify-chess-openings/SKILL.md) for actual widget and mobile/desktop browser journeys. Coverage and unverified areas are explicit; local proof is not CI or deployment acceptance. PGN import supports legal standard-start games; invalid/unsupported PGNs do not replace current history.
