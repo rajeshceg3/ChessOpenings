@@ -5,6 +5,7 @@ import chess.svg
 import chess.pgn
 import datetime
 import io
+import hashlib
 
 # Set page config (including dark theme if directly supported, or use custom CSS)
 # Streamlit's theming has evolved. Forcing a "dark" theme might be part of the theme object
@@ -14,7 +15,7 @@ st.set_page_config(
     layout="wide",
     page_title="Chess Openings Dashboard",
     page_icon=":chess_pawn:",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 
 # Custom CSS for modern look and feel
@@ -246,7 +247,7 @@ with filter_col1:
 with filter_col2:
     name_query = st.text_input("🔍 Search by Name:", "")
     if name_query: # Apply name filter if query exists
-        filtered_df = filtered_df[filtered_df["Name"].str.contains(name_query, case=False, na=False)]
+        filtered_df = filtered_df[filtered_df["Name"].str.contains(name_query, case=False, na=False, regex=False)]
 
 st.dataframe(filtered_df) # Display the possibly filtered dataframe
 
@@ -274,7 +275,16 @@ if not filtered_df.empty:
                     st.session_state.current_move_index = 0
                     st.session_state.board = chess.Board()
                     if moves_str:
-                        st.session_state.current_opening_moves = [m for m in moves_str.split(' ') if m] # Filter out empty strings
+                        game = chess.pgn.read_game(io.StringIO(moves_str))
+                        if game is None or game.errors:
+                            st.warning('This opening has invalid move data.')
+                            st.session_state.current_opening_moves = []
+                        else:
+                            parsed_board = game.board()
+                            st.session_state.current_opening_moves = []
+                            for move in game.mainline_moves():
+                                st.session_state.current_opening_moves.append(parsed_board.san(move))
+                                parsed_board.push(move)
                     else:
                         st.session_state.current_opening_moves = []
                     # No moves played yet, board is fresh for the new opening
@@ -288,6 +298,7 @@ if not filtered_df.empty:
                         if st.button("⬅️ Previous Move", disabled=st.session_state.current_move_index == 0):
                             st.session_state.current_move_index -= 1
                             st.session_state.board.pop()
+                            st.rerun()
 
                     with col2_nav:
                         if st.button("➡️ Next Move", disabled=st.session_state.current_move_index == len(st.session_state.current_opening_moves)):
@@ -295,6 +306,7 @@ if not filtered_df.empty:
                                 move_to_play = st.session_state.current_opening_moves[st.session_state.current_move_index]
                                 st.session_state.board.push_san(move_to_play)
                                 st.session_state.current_move_index += 1
+                                st.rerun()
                             except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
                                 st.warning(f"Invalid move '{move_to_play}': {e}")
                             except IndexError:
@@ -320,24 +332,24 @@ with st.container(border=True): # Group interactive chessboard section
         Replays moves from st.session_state.interactive_moves_history up to move_idx
         and updates st.session_state.interactive_board.
         """
-    board = chess.Board()
-    # Only try to replay moves if there's history and index is valid
-    if st.session_state.interactive_moves_history and move_idx > 0 :
-        for i in range(move_idx):
-            # Check if the move index is within the bounds of the history list
-            if i < len(st.session_state.interactive_moves_history):
-                try:
-                    board.push_san(st.session_state.interactive_moves_history[i])
-                except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
-                    st.error(f"Error replaying move '{st.session_state.interactive_moves_history[i]}' at index {i} (specific chess error): {e}")
+        board = chess.Board()
+        # Only try to replay moves if there's history and index is valid
+        if st.session_state.interactive_moves_history and move_idx > 0 :
+            for i in range(move_idx):
+                # Check if the move index is within the bounds of the history list
+                if i < len(st.session_state.interactive_moves_history):
+                    try:
+                        board.push_san(st.session_state.interactive_moves_history[i])
+                    except (chess.InvalidMoveError, chess.IllegalMoveError, chess.AmbiguousMoveError) as e:
+                        st.error(f"Error replaying move '{st.session_state.interactive_moves_history[i]}' at index {i} (specific chess error): {e}")
+                        break
+                    except Exception as e: # Fallback for other unexpected errors
+                        st.error(f"An unexpected error occurred while replaying move '{st.session_state.interactive_moves_history[i]}' at index {i}: {e}")
+                        break
+                else: # Should not happen if move_idx is managed correctly
+                    st.warning(f"Attempted to replay move at index {i} beyond history length.")
                     break
-                except Exception as e: # Fallback for other unexpected errors
-                    st.error(f"An unexpected error occurred while replaying move '{st.session_state.interactive_moves_history[i]}' at index {i}: {e}")
-                    break
-            else: # Should not happen if move_idx is managed correctly
-                st.warning(f"Attempted to replay move at index {i} beyond history length.")
-                break
-    st.session_state.interactive_board = board
+        st.session_state.interactive_board = board
 
 
     # UI for PGN Upload
@@ -345,7 +357,7 @@ with st.container(border=True): # Group interactive chessboard section
 
     if uploaded_pgn_file is not None:
         # Generate a unique ID for the uploaded file to detect new uploads
-        file_id = f"{uploaded_pgn_file.name}-{uploaded_pgn_file.size}"
+        file_id = hashlib.sha256(uploaded_pgn_file.getvalue()).hexdigest()
         if st.session_state.pgn_file_id != file_id:
             st.session_state.pgn_file_id = file_id
             if 'pgn_processed' in st.session_state:
@@ -358,7 +370,7 @@ with st.container(border=True): # Group interactive chessboard section
             pgn_file_like = io.StringIO(pgn_string)
             game = chess.pgn.read_game(pgn_file_like)
 
-            if game:
+            if game and not game.errors and game.board() == chess.Board():
                 # Clear existing interactive game state
                 st.session_state.interactive_moves_history = []
                 st.session_state.interactive_board = chess.Board() # Reset board
@@ -382,7 +394,7 @@ with st.container(border=True): # Group interactive chessboard section
                 # For simplicity, we'll leave it as is. The user can remove and re-upload.
 
             else:
-                st.error("Error: Could not parse PGN file. Please ensure it's a valid PGN.")
+                st.error("Error: Could not load PGN. Use a valid game from the standard starting position.")
         except Exception as e:
             st.error(f"An error occurred while processing the PGN file: {e}")
         # To prevent reprocessing on every script rerun after a successful upload,
@@ -391,6 +403,8 @@ with st.container(border=True): # Group interactive chessboard section
         # A common pattern is to use st.session_state to store the "processed" state of the file.
 
     # UI for move input
+    if st.session_state.pop('clear_interactive_input', False):
+        st.session_state.interactive_move_input_key = ''
     move_input = st.text_input("Enter your move (e.g., e4, Nf3):", key="interactive_move_input_key", help="Use Standard Algebraic Notation (e.g., e4, Nf3, O-O for castling).")
     # st.caption("Use Standard Algebraic Notation (e.g., e4, Nf3, O-O for castling).") # Alternative way to add help text
     make_move_button = st.button("▶️ Make Move", key="interactive_make_move_button_key")
@@ -402,18 +416,21 @@ with st.container(border=True): # Group interactive chessboard section
             # this new move should effectively create a new branch of history.
             # For simplicity, let's assume new moves always append to the current board state,
             # and if the user was in the past, this new move truncates any "future" moves from old history.
+            candidate = st.session_state.interactive_board.copy()
+            candidate.push_san(move_input)  # Validate before truncating any future moves.
             if st.session_state.interactive_current_move_index < len(st.session_state.interactive_moves_history):
                 # User had navigated back, now making a new move. Truncate old future.
                 st.session_state.interactive_moves_history = st.session_state.interactive_moves_history[:st.session_state.interactive_current_move_index]
                 # The board should already be at interactive_current_move_index due to navigation.
 
             # board_to_update is st.session_state.interactive_board, which is either fresh or replayed to current_move_index
-            st.session_state.interactive_board.push_san(move_input) # Apply new move
+            st.session_state.interactive_board = candidate
 
             st.session_state.interactive_moves_history.append(move_input)
             st.session_state.interactive_current_move_index = len(st.session_state.interactive_moves_history)
 
-            st.session_state.interactive_move_input_key = ""
+            st.session_state.clear_interactive_input = True
+            st.rerun()
             st.success(f"Move '{move_input}' made successfully.")
             # The board is already up-to-date. No replay needed here.
 
@@ -430,12 +447,14 @@ with st.container(border=True): # Group interactive chessboard section
                      disabled=st.session_state.interactive_current_move_index == 0):
             st.session_state.interactive_current_move_index -= 1
             replay_interactive_board_to_index(st.session_state.interactive_current_move_index)
+            st.rerun()
 
     with col_next_interactive:
         if st.button("⏩ Next Interactive Move", key="interactive_next_move",
                      disabled=st.session_state.interactive_current_move_index >= len(st.session_state.interactive_moves_history)):
             st.session_state.interactive_current_move_index += 1
             replay_interactive_board_to_index(st.session_state.interactive_current_move_index)
+            st.rerun()
 
     # Display the interactive chessboard and move count
     st.subheader("Current Interactive Board")
